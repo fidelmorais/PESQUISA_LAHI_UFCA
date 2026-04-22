@@ -81,27 +81,19 @@ def dentro_bounding_box(lat, lon, box):
 def haversine(lat1, lon1, lat2, lon2):
     R = 6371  # km
     dlat = radians(lat2 - lat1)
-    dlon = radians(lat2 - lon1)
+    dlon = radians(lon2 - lon1)
     a = sin(dlat/2)**2 + cos(radians(lat1)) * cos(radians(lat2)) * sin(dlon/2)**2
     return R * 2 * atan2(sqrt(a), sqrt(1 - a))
 
 def filtrar_estacoes_geograficamente(estacoes, bounding_box=None, centro_busca=None, raio_km=None):
-    # Calcula o centro do bounding box
+    """Filtra estações por bounding box e/ou por raio (em km) a partir de um centro."""
     if bounding_box:
         lat_min, lat_max, lon_min, lon_max = bounding_box
         centro_busca = ((lat_min + lat_max)/2, (lon_min + lon_max)/2)
-    # Filtra estações dentro do raio especificado
+        estacoes = [est for est in estacoes if dentro_bounding_box(est["latitude"], est["longitude"], bounding_box)]
     if centro_busca and raio_km:
-        filtradas = [est for est in estacoes if haversine(est['latitude'], est['longitude'], *centro_busca) <= raio_km]
-        return filtradas
+        estacoes = [est for est in estacoes if haversine(est['latitude'], est['longitude'], *centro_busca) <= raio_km]
     return estacoes
-    """Filtra estações por bounding box e/ou por raio (em km) a partir de um centro."""
-    filtradas = estacoes
-    if bounding_box:
-        filtradas = [est for est in filtradas if dentro_bounding_box(est["latitude"], est["longitude"], bounding_box)]
-    if centro_busca & raio_km:
-        filtradas = [est for est in filtradas if haversine(est["latitude"], est["longitude"], *centro_busca) <= raio_km]
-    return filtradas
 
 def buscar_serie_estacao(token, codigo_estacao, data_inicial, data_final=None, intervalo="DIAS_30"):
     """
@@ -141,22 +133,6 @@ def buscar_serie_estacao(token, codigo_estacao, data_inicial, data_final=None, i
         if items:
             resultados.extend([item for item in items if item.get("Chuva_Adotada") is not None])
     return resultados
-    url = "https://www.ana.gov.br/hidrowebservice/EstacoesTelemetricas/HidroinfoanaSerieTelemetricaAdotada"
-    headers = {"Authorization": f"Bearer {token}"}
-    params = {
-        "codigoEstacao": codigo_estacao,
-        "codigoTipoGrandeza": 1,  # precipitação
-        "dataInicial": data_inicial,  # formato yyyy-MM-dd
-        "dataFinal": data_final
-    }
-    response = requests.get(url, headers=headers, params=params)
-    print(response.status_code)
-    print(response.text)
-    response.raise_for_status()
-    items = response.json().get("items", [])
-    if items:
-        return [item for item in items if item.get("Chuva_Adotada") is not None]
-    return []
 
 # Exemplo de fluxo principal (pode ser adaptado para scripts ou notebooks):
 def fluxo_completo_ana(identificador, senha, bounding_box, centro_busca, raio_km, data_inicial, data_final):
@@ -251,11 +227,6 @@ def fetch_series(cod, start, end, session, tipo_filtro="DATA_LEITURA", intervalo
         df.set_index("Data", inplace=True)
         return df["Chuva_Adotada"].astype(float)
     return pd.Series(dtype=float)
-
-    if resultados:
-        return pd.concat(resultados).sort_index()
-    else:
-        return pd.Series(dtype=float)
 
 # Une todas as séries de precipitação das estações em um único Dataset xarray
 # stations: GeoDataFrame das estações

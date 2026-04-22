@@ -429,17 +429,14 @@ def main():
     
     logger.info(f"Evento de exemplo para visualização: Data={example_date_str}, Precipitação={example_precip_val:.1f}mm")
 
-    dem_pred, lulc_pred = (
-        load_and_align_raster(p, template_crs, template_affine, template_shape[1], template_shape[0], m, v)
-        for p, m, v in [
-            (DEM_FILE_PATH, Resampling.bilinear, (rasterio.open(DEM_FILE_PATH).nodata or -9999.0)),
-            (LULC_FILE_PATH, Resampling.nearest, 0)
-        ]
-    )
+    with rasterio.open(DEM_FILE_PATH) as _dem_src:
+        dem_nodata = _dem_src.nodata or -9999.0
+
+    dem_pred = load_and_align_raster(DEM_FILE_PATH, template_crs, template_affine, template_shape[1], template_shape[0], Resampling.bilinear, dem_nodata)
+    lulc_pred = load_and_align_raster(LULC_FILE_PATH, template_crs, template_affine, template_shape[1], template_shape[0], Resampling.nearest, 0)
+
     if dem_pred is None or lulc_pred is None:
         logger.error("Falha ao recarregar dados para a predição. Encerrando."); return
-
-    dem_nodata = rasterio.open(DEM_FILE_PATH).nodata or -9999.0
     valid_pixels_pred = (dem_pred != dem_nodata) & np.isfinite(dem_pred)
     slope_pred = calculate_slope(dem_pred, abs(template_affine.a), abs(template_affine.e))
     

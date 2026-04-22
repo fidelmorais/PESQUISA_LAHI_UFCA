@@ -5,13 +5,17 @@
 # Integração com PyGMT para visualização avançada de dados topográficos.
 from pathlib import Path
 from typing import Tuple, Literal, Optional, Dict, Union
+import logging
 import rasterio
 from rasterio.merge import merge
 import xarray as xr
 import numpy as np
 import os
 import requests
-import logging_custom as logging
+
+# Configuração de logging
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+logger = logging.getLogger('topography')
 
 # Importação do PyGMT para visualização avançada
 try:
@@ -19,12 +23,8 @@ try:
     PYGMT_AVAILABLE = True
 except ImportError:
     PYGMT_AVAILABLE = False
-    logging.warning("PyGMT não está instalado. Algumas funcionalidades de visualização não estarão disponíveis.")
-    logging.warning("Instale com: pip install pygmt")
-
-# Configuração de logging
-logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
-logger = logging.getLogger('topography')
+    logger.warning("PyGMT não está instalado. Algumas funcionalidades de visualização não estarão disponíveis.")
+    logger.warning("Instale com: pip install pygmt")
 
 # S3 path público (Registry of Open Data on AWS)
 BUCKET = "s3://copernicus-dem-30m"
@@ -136,13 +136,10 @@ def fetch_dem(bounds: Optional[Tuple[float, float, float, float]] = None, cache_
             timeout=600
         )
         with rasterio.open(gee_export_path) as src:
-            arr = src.read(1).astype(np.float32)  # <- converte aqui
+            arr = src.read(1).astype(np.float32)
             profile = src.profile
-            profile["dtype"] = "float32"  # mantém coerência
-            arr[arr == src.nodata] = np.nan  # Normalizar NoData
-            profile = src.profile
-            profile["dtype"] = "float32"  # mantém coerência
-            arr[arr == src.nodata] = np.nan  # Normalizar NoData
+            profile["dtype"] = "float32"
+            arr[arr == src.nodata] = np.nan
         transform = profile.get("transform")
         if transform is not None and transform[4] > 0:
             profile["transform"] = (transform[0], transform[1], transform[2], transform[3], -abs(transform[4]), transform[5])
